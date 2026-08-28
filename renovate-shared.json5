@@ -1,0 +1,150 @@
+// The Lautstark Renovate preset.
+//
+// ---------------------------------------------------------------------------
+// HOW TO USE THIS
+//
+// It lived in vorlaut-editor until 2026-08-28, written to be liftable without
+// an edit, and this is where it was going. A repository picks it up with one
+// line:
+//
+//     { extends: ["github>Lautstark/.github//renovate-shared.json5"] }
+//
+// The .json5 is spelled out because the //path syntax implies .json. The
+// shorter "owner/repo:name" form does the same, so it cannot be used for this
+// file either - Renovate looks for a file that is not there and stops before
+// it does anything.
+//
+// WHAT BELONGS HERE, AND WHAT DOES NOT
+//
+// Everything in this file is true of every Lautstark repository: when updates
+// arrive, what groups with what, what may merge itself. Nothing here names a
+// package.
+//
+// Anything about a *particular* dependency stays in the repository's own
+// renovate.json5, and that is not tidiness. The clearest case is the
+// github:-pinned @lautstark/* packages: the three apps disable Renovate for
+// them because a bump of those is a decision rather than an update, and
+// pins.js is what watches them instead. A repository that inherited that rule
+// from here would be silently opting out of updates to dependencies it does
+// not have. Same for onnxruntime-web, whose version is written in three files
+// at once in the repositories that pin it.
+//
+// NOT COVERED: Gradle, Kotlin, Android. The Android repository does not exist
+// yet, and a preset written against a guess about its build is a preset that
+// will be wrong when it arrives. Add a manager for it then, from the actual
+// build files.
+// ---------------------------------------------------------------------------
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  extends: [
+    "config:recommended",
+
+    // Conventional commits, with the split release-please wants: a runtime
+    // dependency bump is "fix(deps):" and shows up in the changelog, a dev
+    // one is "chore(deps):" and does not. Nobody reading a release note cares
+    // which version of vitest built it.
+    ":semanticPrefixFixDepsChoreOthers",
+
+    // One issue listing everything waiting, rather than a wall of pull
+    // requests. For a solo maintainer this is the difference between reading
+    // them and muting them.
+    ":dependencyDashboard",
+  ],
+
+  timezone: "Europe/Berlin",
+
+  // Weekly. Monday before six, so a week's worth of updates is one thing to
+  // look at on Monday morning rather than a trickle all week.
+  schedule: ["before 6am on monday"],
+  // lockFileMaintenance carries its own schedule and does not inherit.
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ["before 6am on monday"],
+  },
+
+  // Three pull requests is a Monday. Thirty is a mute button.
+  prConcurrentLimit: 3,
+  prHourlyLimit: 0,
+
+  // Renovate rebases only what has gone stale, rather than rewriting every
+  // open branch every run.
+  rebaseWhen: "conflicted",
+
+  // Security fixes are the one thing that must not wait for Monday.
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    schedule: ["at any time"],
+    minimumReleaseAge: null,
+    labels: ["security"],
+    // Never automerged, whatever it is. A security bump is exactly the moment
+    // to look at the diff.
+    automerge: false,
+  },
+
+  packageRules: [
+    // ---------------------------------------------------------------------
+    // Development dependencies: grouped, and the only thing that automerges
+    // ---------------------------------------------------------------------
+    {
+      matchDepTypes: ["devDependencies"],
+      matchUpdateTypes: ["patch", "minor"],
+      groupName: "dev dependencies",
+      commitMessageTopic: "the dev dependencies",
+      automerge: true,
+      // Merge the pull request rather than rebasing or squashing outside the
+      // platform, so the merge is recorded the way every other merge is.
+      platformAutomerge: true,
+      // Three days between a version being published and this merging it
+      // unattended. Compromised packages are typically pulled within hours,
+      // and nothing here is urgent enough to need a release the day it lands.
+      minimumReleaseAge: "3 days",
+      labels: ["dependencies", "automerge"],
+    },
+
+    // ---------------------------------------------------------------------
+    // Everything else: grouped, and looked at by a person
+    // ---------------------------------------------------------------------
+    {
+      matchDepTypes: ["dependencies"],
+      matchUpdateTypes: ["patch", "minor"],
+      groupName: "runtime dependencies",
+      commitMessageTopic: "the runtime dependencies",
+      automerge: false,
+      labels: ["dependencies"],
+    },
+
+    {
+      matchManagers: ["github-actions"],
+      groupName: "GitHub Actions",
+      automerge: false,
+      labels: ["ci"],
+      // A judgement call worth naming: these are CI tooling and look like dev
+      // dependencies, but they are not devDependencies, and the rule is that
+      // only devDependencies automerge. They also run with a token that can
+      // write to the repository, which is a good reason for the stricter
+      // reading rather than the convenient one. Flipping it is this one line.
+    },
+
+    // ---------------------------------------------------------------------
+    // Majors are never grouped and never automerged
+    // ---------------------------------------------------------------------
+    {
+      matchUpdateTypes: ["major"],
+      groupName: null,
+      automerge: false,
+      labels: ["dependencies", "major"],
+      // On its own, so that the one that breaks the build is obvious rather
+      // than being one of nine changes in a pull request called "dev
+      // dependencies".
+    },
+
+    // lockFileMaintenance is its own pull request, and is not automerged: it
+    // can move transitive dependencies that no direct bump would have.
+    {
+      matchUpdateTypes: ["lockFileMaintenance"],
+      automerge: false,
+      labels: ["dependencies"],
+    },
+  ],
+}
