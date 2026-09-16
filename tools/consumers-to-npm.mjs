@@ -86,8 +86,8 @@ if (left.length === 0) {
       const after = before.replace(/^      - (?:name:[^\n]*\n(?:        [^\n]*\n|\n)*?|)        run: (?:npm run preflight|node (?:tools\/|node_modules\/@lautstark\/design\/)(?:pins|installcheck)\.(?:m?js)[^\n]*)\n(?:\n)?/gm, '')
         .replace(/^      - run: node node_modules\/@lautstark\/design\/pins\.js[^\n]*\n/gm, '')
         // The shadows step's comment leaned on the step above it.
-        .replace(/# pins\.js above asks whether this product has the right version of\n(\s*)# @lautstark\/design\. This asks the question underneath it: whether it\n\s*# is using it\./g,
-          '# Renovate keeps this product on the current @lautstark/design. This\n$1# asks the question underneath that: whether it is using it.');
+        .replace(/# pins\.js above asks whether this product has the right version of\n(\s*)# @lautstark\/design\. This asks the question underneath it: whether it\n(\s*)# is using it\./g,
+          '# Renovate keeps this product on the current @lautstark/design. This\n$1# asks the question underneath that: whether it is actually using\n$2# it.');
       if (after !== before) { console.log(`${p}: pins/preflight steps removed`); write(p, after); }
       for (const [i, line] of after.split('\n').entries()) {
         if (/pins\.js|installcheck|preflight/.test(line)) console.log(`  ${p}:${i + 1} still mentions it in prose - read it: ${line.trim().slice(0, 70)}`);
