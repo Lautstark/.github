@@ -18,17 +18,44 @@ so either of those looks for a file that is not here and stops before doing
 anything.
 
 What it settles: updates arrive weekly, Monday before six, Europe/Berlin, as
-at most three pull requests with one dashboard issue listing the rest.
-Development dependencies group together and are the only thing that merges
-itself, after three days on the registry. Runtime dependencies, GitHub Actions
-and every major are grouped but wait for a person. Security advisories ignore
-the schedule and are never automerged.
+at most three branches with one dashboard issue listing the rest. Since
+2026-09-16 a branch that merges itself does so **without a pull request**:
+Renovate pushes `renovate/<name>`, waits for the repository's tests on it, and
+pushes the commit to `main` — which is why every repository's test workflow
+runs on `renovate/**` and its deploy job checks for `main` by ref. Three
+things merge themselves that way, each a minor or a patch: development
+dependencies after three days on the registry, the toolchain (vite, vitest,
+typescript, playwright) under its own name after the same three days, and the
+family's own `@lautstark/*` packages from npm with no wait. Every major, every
+other runtime dependency, GitHub Actions and lockfile maintenance are grouped
+but wait for a person. Security advisories ignore the schedule and are never
+automerged.
 
-What it deliberately does **not** settle is anything naming a particular
-package. Those rules live in each repository's own `renovate.json5`, because a
-rule about a dependency is only true where that dependency is. The two in use
-today are the `github:`-pinned `@lautstark/*` packages and `onnxruntime-web`;
-both are disabled where they appear, and both files say why at length.
+What it deliberately does **not** settle is anything true of one repository
+only. Those rules live in that repository's `renovate.json5`: `onnxruntime-web`
+where it is pinned, and `@lautstark/bildquelle` where it is consumed, which
+stays a person's decision because what it changes is what may leave a METACOM
+folder.
+
+## `.github/workflows/commit-messages.yml`
+
+The conventional-commit gate, as a reusable workflow. Eleven repositories
+carried it verbatim until 2026-09-16 and three had already drifted; each now
+calls this one:
+
+```yaml
+on:
+  push:
+    branches: [main, 'claude/**', 'renovate/**']
+  pull_request:
+jobs:
+  subjects:
+    uses: Lautstark/.github/.github/workflows/commit-messages.yml@main
+```
+
+The rule itself stays in each repository's `tools/check-commit-subject.sh`,
+because the `commit-msg` hook there calls the same file; this workflow applies
+it to every non-merge commit in a push and skips commits older than the file.
 
 ## `.github/workflows/release.yml`
 

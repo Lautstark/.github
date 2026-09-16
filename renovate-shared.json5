@@ -21,13 +21,52 @@
 // package.
 //
 // Anything about a *particular* dependency stays in the repository's own
-// renovate.json5, and that is not tidiness. The clearest case is the
-// github:-pinned @lautstark/* packages: the three apps disable Renovate for
-// them because a bump of those is a decision rather than an update, and
-// pins.js is what watches them instead. A repository that inherited that rule
-// from here would be silently opting out of updates to dependencies it does
-// not have. Same for onnxruntime-web, whose version is written in three files
-// at once in the repositories that pin it.
+// renovate.json5, and that is not tidiness: a repository that inherited such
+// a rule from here would be silently opting out of updates to dependencies it
+// does not have. onnxruntime-web, whose version is written in three files at
+// once in the repositories that pin it, is the standing example.
+//
+// Two exceptions, both added 2026-09-16, and both true of every repository
+// in the family rather than of one:
+//
+//   @lautstark/*   the shared packages, published to npmjs.org from their
+//                  main branches by CI since that date. Until then the apps
+//                  pinned them as github: tags and disabled Renovate for them,
+//                  because "a bump of these is a decision, not an update".
+//                  What changed is where the decision is made. The package
+//                  author makes it in the commit subject - feat is a minor,
+//                  fix a patch, feat! a major - and the consumer's tests make
+//                  it again on the branch Renovate pushes. A minor or a patch
+//                  that passes them merges to main on its own; a major waits
+//                  for a person, with the changelog in front of them. The
+//                  rule is here because every app consumes these packages
+//                  the same way now; the one package a repository still keeps
+//                  by hand (bildquelle, where what changes is what may leave a
+//                  METACOM folder) is named in that repository's own file.
+//
+//   the toolchain  vite, vitest, typescript, playwright: grouped under one
+//                  name in every repository, so that a week's bumps are one
+//                  branch per repository with the same title, and a repository
+//                  that has not taken them is visible on its dashboard as the
+//                  one without that branch. @lautstark/toolchain is where
+//                  those versions are meant to live once; until every app
+//                  extends it, the group is what keeps them from drifting.
+//
+// HOW AUTOMERGE WORKS HERE, SINCE 2026-09-16
+//
+// automergeType "branch": Renovate pushes renovate/<name>, waits for the
+// branch's status checks, and if they are green pushes that commit to main
+// itself. No pull request is opened for a branch that merges, which is the
+// shape this family lands everything in (trunk-based, no pull requests). The
+// consequence for a repository is that its test workflow has to run on
+// renovate/** branches, and its deploy job has to check github.ref rather
+// than the event name - both are done in every repository's workflows. A
+// branch with no status checks is never merged (ignoreTests stays false).
+//
+// platformAutomerge stays on for the one case Renovate falls back to a pull
+// request - a branch that cannot be fast-forwarded - so that one merges on
+// its own too, through GitHub's own merge queue rather than by rebasing
+// outside the platform.
 //
 // NOT COVERED: Gradle, Kotlin, Android. The Android repository does not exist
 // yet, and a preset written against a guess about its build is a preset that
@@ -92,14 +131,83 @@
       groupName: "dev dependencies",
       commitMessageTopic: "the dev dependencies",
       automerge: true,
-      // Merge the pull request rather than rebasing or squashing outside the
-      // platform, so the merge is recorded the way every other merge is.
+      // Straight to main once the branch is green - see the header. The
+      // pull-request fallback merges on the platform too.
+      automergeType: "branch",
       platformAutomerge: true,
       // Three days between a version being published and this merging it
       // unattended. Compromised packages are typically pulled within hours,
       // and nothing here is urgent enough to need a release the day it lands.
       minimumReleaseAge: "3 days",
       labels: ["dependencies", "automerge"],
+    },
+
+    // ---------------------------------------------------------------------
+    // The toolchain: one group, one name, in every repository
+    // ---------------------------------------------------------------------
+    //
+    // After the dev-dependency group so that it wins - a later rule overrides
+    // an earlier one, and a toolchain bump is a dev-dependency bump too, which
+    // the rule above would otherwise fold into "dev dependencies". Same
+    // automerge policy as those - a minor or a patch
+    // merges itself after three days on the registry, a major does not - but
+    // under its own title, so that "vitest 4" arriving in six repositories is
+    // six branches called the same thing.
+    {
+      matchPackageNames: [
+        "vite",
+        "vitest",
+        "@vitest/**",
+        "vite-node",
+        "typescript",
+        "@playwright/test",
+        "playwright",
+        "@lautstark/toolchain",
+      ],
+      matchUpdateTypes: ["patch", "minor"],
+      groupName: "toolchain",
+      commitMessageTopic: "the toolchain",
+      automerge: true,
+      automergeType: "branch",
+      platformAutomerge: true,
+      minimumReleaseAge: "3 days",
+      labels: ["dependencies", "toolchain", "automerge"],
+    },
+
+    // ---------------------------------------------------------------------
+    // The shared packages: a minor or a patch merges itself, a major waits
+    // ---------------------------------------------------------------------
+    //
+    // Only from npm. A github: pin still in a package.json resolves through
+    // the github-tags datasource, and those are left alone below: no tag cut
+    // after 2026-09-16 carries a build step, so a bump of one would install
+    // a package with no dist. The way forward for such a pin is the range,
+    // not a newer tag.
+    //
+    // Runtime dependencies, and they merge themselves anyway - the one place
+    // this preset says so. What makes that safe is not that the change is
+    // small; it is that the package's author wrote the size of it into the
+    // commit subject, the package's own tests held it, and the consumer's
+    // tests hold it again here. A group of its own rather than "runtime
+    // dependencies", so that what the family published is one branch and
+    // what npm published is another. No minimumReleaseAge: these are the
+    // family's own releases, and the three days exist for a stranger's.
+    {
+      matchDatasources: ["npm"],
+      matchPackageNames: ["@lautstark/**"],
+      matchUpdateTypes: ["patch", "minor"],
+      groupName: "shared packages",
+      commitMessageTopic: "the shared packages",
+      automerge: true,
+      automergeType: "branch",
+      platformAutomerge: true,
+      minimumReleaseAge: null,
+      labels: ["dependencies", "shared", "automerge"],
+    },
+    {
+      matchDatasources: ["github-tags"],
+      matchPackageNames: ["Lautstark/**"],
+      enabled: false,
     },
 
     // ---------------------------------------------------------------------
