@@ -82,6 +82,18 @@ notice and stays green.
 
 Added 2026-09-16, when the packages moved from `github:` tags to npm.
 
+## `tools/consumers-to-npm.mjs`
+
+Step 3 of the 2026-09-16 release automation, as a script an app runs in its
+own checkout once the packages are on npmjs.org: every
+`github:Lautstark/<pkg>#vX.Y.Z` pin becomes `^X.Y.Z` on the npm package, and
+once no `github:` pin is left, the things that only policed those pins go
+with them — `tools/installcheck.mjs` and its script prefixes, the `pins.js`
+and preflight steps in the workflows, the install check in `tests/run.py`,
+and the product's own `.small/.muted/.faint` rules that `components.css`
+draws since design 1.32. It writes files and stops; `npm install`, the
+suites and the commit are the person's. `--dry-run` only talks.
+
 ## Renovate has to be installed for any of this to run
 
 The preset is configuration, not a service. Renovate acts on these
