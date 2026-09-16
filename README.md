@@ -30,6 +30,31 @@ rule about a dependency is only true where that dependency is. The two in use
 today are the `github:`-pinned `@lautstark/*` packages and `onnxruntime-web`;
 both are disabled where they appear, and both files say why at length.
 
+## `.github/workflows/release.yml`
+
+The release train for the shared packages, as a reusable workflow. A package
+calls it on every push to `main`:
+
+```yaml
+jobs:
+  release:
+    uses: Lautstark/.github/.github/workflows/release.yml@main
+    with:
+      gate: npm run typecheck && npm test && npm run build
+    secrets: inherit
+```
+
+It runs the gate, checks that the tarball `npm pack` would ship is complete
+and prebuilt, and hands over to semantic-release, which reads the commit
+subjects since the last tag and either cuts a release — version, CHANGELOG,
+tag, npm publish, GitHub release — or does nothing. The one-time account
+setup it needs (the `@lautstark` scope on npmjs.org, and either trusted
+publishing or an `NPM_TOKEN` secret) is described at the head of the file and
+in each package's `RELEASING.md`. Until that exists the workflow stops with a
+notice and stays green.
+
+Added 2026-09-16, when the packages moved from `github:` tags to npm.
+
 ## Renovate has to be installed for any of this to run
 
 The preset is configuration, not a service. Renovate acts on these
