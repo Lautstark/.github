@@ -3,43 +3,31 @@ name: Release
 # The release train for the shared packages, written once.
 #
 # A package calls this on every push to main. It installs, runs the package's
-# own gate, checks that what `npm pack` would ship is complete, and then lets
-# semantic-release decide whether the commits since the last tag add up to a
-# release. If they do, semantic-release bumps package.json, writes the
-# CHANGELOG, commits both, tags, publishes to npmjs.org and writes the GitHub
-# release. If they do not - docs, ci, chore, refactor - nothing happens and the
-# run is green.
+# own gate, and then lets semantic-release decide whether the commits since
+# the last tag add up to a release. If they do, semantic-release bumps
+# package.json, writes the CHANGELOG, commits both, tags, and writes the
+# GitHub release. If they do not - docs, ci, chore, refactor - nothing happens
+# and the run is green.
 #
-# Nobody bumps a version by hand any more. The version is a function of the
-# commit subjects: feat is a minor, fix and perf a patch, feat! or a BREAKING
-# CHANGE trailer a major. That is the same rule commit-messages.yml already
-# holds every commit to, which is why the two live in the same repository.
+# There is no registry. A git tag is the release, the way it always was in
+# this family: consumers pin `github:Lautstark/<pkg>#vX.Y.Z`, npm fetches the
+# tag and runs the package's `prepare` on their machine, and Renovate moves the
+# pin when a new tag appears. What changed on 2026-09-16 is only who cuts the
+# tag: nobody bumps a version by hand any more. The version is a function of
+# the commit subjects: feat is a minor, fix and perf a patch, feat! or a
+# BREAKING CHANGE trailer a major. That is the same rule commit-messages.yml
+# already holds every commit to, which is why the two live in the same
+# repository.
 #
-# Written 2026-09-16, when the packages moved from `github:` tags to npm.
+# (For one afternoon this workflow also published to npmjs.org. The family
+# decided against a registry the same day - the code is public already, and a
+# shop window was not wanted - so the npm half went and nothing was ever
+# published.)
 #
 # What the caller provides:
 #
-#   gate       the command that has to pass before anything is released -
-#              typically "npm run typecheck && npm test && npm run build".
-#              The build is part of it: dist/ is in the tarball now, and a
-#              tarball is only as good as the build that ran before `npm pack`.
-#   secrets    `secrets: inherit`, so NPM_TOKEN reaches this if the caller's
-#              organisation has one.
-#
-# How it authenticates to npm, and the one thing a person has to do first:
-#
-#   The package has to exist on npmjs.org before any of this can run against
-#   it, and the @lautstark scope has to belong to somebody. That first publish
-#   is an account action, done once, by hand (RELEASING.md in each package).
-#   After it, either
-#     - the npm side trusts this workflow directly (npmjs.org -> package ->
-#       Settings -> Trusted Publisher: GitHub Actions, Lautstark/<repo>,
-#       release.yml), and the repository sets a variable
-#       NPM_TRUSTED_PUBLISHING=true so this knows to try; or
-#     - an organisation secret NPM_TOKEN holds a granular automation token.
-#   Until one of those is in place the run stops before semantic-release with
-#   a notice and stays green, so main is not red for a reason nobody can fix
-#   from inside the repository.
+#   gate   the command that has to pass before anything is tagged -
+#          typically "npm run typecheck && npm test && npm run build".
 
 on:
   workflow_call:
@@ -51,9 +39,6 @@ on:
       node-version:
         type: string
         default: '22'
-    secrets:
-      NPM_TOKEN:
-        required: false
 
 permissions: {}
 
@@ -72,11 +57,6 @@ jobs:
       # when the next one succeeds.
       issues: write
       pull-requests: write
-      # Trusted publishing: npm exchanges this workflow's identity token for
-      # a short-lived publish credential, and the tarball carries provenance.
-      id-token: write
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -91,64 +71,13 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
-          registry-url: https://registry.npmjs.org
-
-      # Trusted publishing needs npm 11.5.1 or newer, and Node 22 ships an
-      # older one. The global npm is the only thing this touches.
-      - run: npm install -g npm@11
 
       - run: npm ci
 
       - name: The gate
         run: ${{ inputs.gate }}
 
-      # What `npm pack` would ship has to be the whole package: every entry in
-      # `exports` present in the file list, and no `prepare` script left over
-      # from the days when consumers compiled this on their own machines. A
-      # tarball missing dist/ installs fine and fails at the first import.
-      - name: The tarball is prebuilt and complete
-        run: |
-          npm pack --dry-run --json > /tmp/pack.json
-          node - <<'JS'
-          const fs = require('node:fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const [pack] = JSON.parse(fs.readFileSync('/tmp/pack.json', 'utf8'));
-          const shipped = new Set(pack.files.map((f) => f.path));
-          const wanted = new Set();
-          const walk = (value) => {
-            if (typeof value === 'string') { if (!value.includes('*')) wanted.add(value.replace(/^\.\//, '')); }
-            else if (value && typeof value === 'object') Object.values(value).forEach(walk);
-          };
-          walk(pkg.exports); walk(pkg.main); walk(pkg.types);
-          const missing = [...wanted].filter((f) => !shipped.has(f));
-          let bad = false;
-          if (missing.length) {
-            console.error('declared in package.json but not in the tarball:');
-            for (const f of missing) console.error(`  ${f}`);
-            bad = true;
-          }
-          if (pkg.scripts?.prepare) {
-            console.error('package.json still has a `prepare` script. The tarball ships built; consumers must not build it again.');
-            bad = true;
-          }
-          if (bad) process.exit(1);
-          console.log(`${pack.filename}: ${pack.entryCount} files, every declared entry point present, no prepare script.`);
-          JS
-
-      - name: Whether npm publishing is set up yet
-        id: npm
-        env:
-          TRUSTED: ${{ vars.NPM_TRUSTED_PUBLISHING }}
-        run: |
-          if [ -n "$NPM_TOKEN" ] || [ "$TRUSTED" = "true" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=No release cut::Neither an NPM_TOKEN secret nor the NPM_TRUSTED_PUBLISHING=true variable is set, so nothing was published. The gate passed. See RELEASING.md for the one-time setup."
-          fi
-
       - name: semantic-release
-        if: steps.npm.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -156,12 +85,10 @@ jobs:
 
       # The check the tag-triggered CI used to make, adapted: there is no
       # hand-written tag any more, so the question is asked of the commit
-      # semantic-release just made. The tag on HEAD, package.json, and what
-      # the registry now says about that version have to be the same number.
-      # If HEAD carries no tag, nothing was released this run, and that is a
-      # valid answer.
-      - name: Tag, package.json and the registry agree
-        if: steps.npm.outputs.ready == 'true'
+      # semantic-release just made. The tag on HEAD and package.json have to
+      # be the same number. If HEAD carries no tag, nothing was released this
+      # run, and that is a valid answer.
+      - name: Tag and package.json agree
         run: |
           tag=$(git describe --tags --exact-match HEAD 2>/dev/null || true)
           if [ -z "$tag" ]; then
@@ -169,14 +96,8 @@ jobs:
             exit 0
           fi
           pkg="v$(npm pkg get version | tr -d '"')"
-          name=$(npm pkg get name | tr -d '"')
           if [ "$tag" != "$pkg" ]; then
             echo "::error::tag $tag but package.json says $pkg"
             exit 1
           fi
-          published=$(npm view "$name@${pkg#v}" version 2>/dev/null || true)
-          if [ "$published" != "${pkg#v}" ]; then
-            echo "::error::$tag is tagged but the registry does not have $name@${pkg#v}"
-            exit 1
-          fi
-          echo "$tag: package.json and $name on npmjs.org agree."
+          echo "$tag: the tag and package.json agree."

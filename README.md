@@ -26,7 +26,8 @@ runs on `renovate/**` and its deploy job checks for `main` by ref. Three
 things merge themselves that way, each a minor or a patch: development
 dependencies after three days on the registry, the toolchain (vite, vitest,
 typescript, playwright) under its own name after the same three days, and the
-family's own `@lautstark/*` packages from npm with no wait. Every major, every
+family's own `@lautstark/*` packages — `github:` tags, followed through the
+github-tags datasource — with no wait. Every major, every
 other runtime dependency, GitHub Actions and lockfile maintenance are grouped
 but wait for a person. Security advisories ignore the schedule and are never
 automerged.
@@ -71,28 +72,13 @@ jobs:
     secrets: inherit
 ```
 
-It runs the gate, checks that the tarball `npm pack` would ship is complete
-and prebuilt, and hands over to semantic-release, which reads the commit
+It runs the gate and hands over to semantic-release, which reads the commit
 subjects since the last tag and either cuts a release — version, CHANGELOG,
-tag, npm publish, GitHub release — or does nothing. The one-time account
-setup it needs (the `@lautstark` scope on npmjs.org, and either trusted
-publishing or an `NPM_TOKEN` secret) is described at the head of the file and
-in each package's `RELEASING.md`. Until that exists the workflow stops with a
-notice and stays green.
+tag, GitHub release — or does nothing. There is no registry: a git tag is the
+release, consumers pin `github:Lautstark/<pkg>#vX.Y.Z` as they always have,
+and Renovate moves the pin. Nothing needs an account or a secret.
 
-Added 2026-09-16, when the packages moved from `github:` tags to npm.
-
-## `tools/consumers-to-npm.mjs`
-
-Step 3 of the 2026-09-16 release automation, as a script an app runs in its
-own checkout once the packages are on npmjs.org: every
-`github:Lautstark/<pkg>#vX.Y.Z` pin becomes `^X.Y.Z` on the npm package, and
-once no `github:` pin is left, the things that only policed those pins go
-with them — `tools/installcheck.mjs` and its script prefixes, the `pins.js`
-and preflight steps in the workflows, the install check in `tests/run.py`,
-and the product's own `.small/.muted/.faint` rules that `components.css`
-draws since design 1.32. It writes files and stops; `npm install`, the
-suites and the commit are the person's. `--dry-run` only talks.
+Added 2026-09-16, when the packages stopped being tagged by hand.
 
 ## Renovate has to be installed for any of this to run
 

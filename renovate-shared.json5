@@ -29,19 +29,24 @@
 // Two exceptions, both added 2026-09-16, and both true of every repository
 // in the family rather than of one:
 //
-//   @lautstark/*   the shared packages, published to npmjs.org from their
-//                  main branches by CI since that date. Until then the apps
-//                  pinned them as github: tags and disabled Renovate for them,
-//                  because "a bump of these is a decision, not an update".
-//                  What changed is where the decision is made. The package
-//                  author makes it in the commit subject - feat is a minor,
-//                  fix a patch, feat! a major - and the consumer's tests make
-//                  it again on the branch Renovate pushes. A minor or a patch
-//                  that passes them merges to main on its own; a major waits
-//                  for a person, with the changelog in front of them. The
-//                  rule is here because every app consumes these packages
-//                  the same way now; the one package a repository still keeps
-//                  by hand (bildquelle, where what changes is what may leave a
+//   @lautstark/*   the shared packages, pinned as github: tags - and since
+//                  2026-09-16 tagged from their main branches by CI rather
+//                  than by hand. Until then the apps disabled Renovate for
+//                  them, because "a bump of these is a decision, not an
+//                  update" and because the npm manager was thought unable to
+//                  follow a github: tag. It can: a `github:owner/repo#vX.Y.Z`
+//                  pin resolves through the github-tags datasource, and
+//                  Renovate rewrites the tag and the lockfile's commit the
+//                  way it rewrites a range. What changed is where the
+//                  decision is made. The package author makes it in the
+//                  commit subject - feat is a minor, fix a patch, feat! a
+//                  major - and the consumer's tests make it again on the
+//                  branch Renovate pushes. A minor or a patch that passes
+//                  them merges to main on its own; a major waits for a
+//                  person, with the changelog in front of them. The rule is
+//                  here because every app consumes these packages the same
+//                  way; the one package a repository still keeps by hand
+//                  (bildquelle, where what changes is what may leave a
 //                  METACOM folder) is named in that repository's own file.
 //
 //   the toolchain  vite, vitest, typescript, playwright: grouped under one
@@ -163,6 +168,7 @@
         "@playwright/test",
         "playwright",
         "@lautstark/toolchain",
+        "Lautstark/toolchain",
       ],
       matchUpdateTypes: ["patch", "minor"],
       groupName: "toolchain",
@@ -178,23 +184,24 @@
     // The shared packages: a minor or a patch merges itself, a major waits
     // ---------------------------------------------------------------------
     //
-    // Only from npm. A github: pin still in a package.json resolves through
-    // the github-tags datasource, and those are left alone below: no tag cut
-    // after 2026-09-16 carries a build step, so a bump of one would install
-    // a package with no dist. The way forward for such a pin is the range,
-    // not a newer tag.
+    // github-tags is the datasource a `github:Lautstark/<pkg>#vX.Y.Z` pin
+    // resolves through; the package name it carries is the repository,
+    // `Lautstark/<pkg>`, and the pin string stays a pin - an exact tag, which
+    // is what this family wants an install to be made of. Renovate moves the
+    // tag; nothing else can move it.
     //
     // Runtime dependencies, and they merge themselves anyway - the one place
     // this preset says so. What makes that safe is not that the change is
     // small; it is that the package's author wrote the size of it into the
     // commit subject, the package's own tests held it, and the consumer's
-    // tests hold it again here. A group of its own rather than "runtime
-    // dependencies", so that what the family published is one branch and
-    // what npm published is another. No minimumReleaseAge: these are the
-    // family's own releases, and the three days exist for a stranger's.
+    // tests hold it again here, with the package built on the branch by its
+    // own `prepare`. A group of its own rather than "runtime dependencies",
+    // so that what the family tagged is one branch and what npm published is
+    // another. No minimumReleaseAge: these are the family's own releases, and
+    // the three days exist for a stranger's.
     {
-      matchDatasources: ["npm"],
-      matchPackageNames: ["@lautstark/**"],
+      matchDatasources: ["github-tags"],
+      matchPackageNames: ["Lautstark/**", "@lautstark/**"],
       matchUpdateTypes: ["patch", "minor"],
       groupName: "shared packages",
       commitMessageTopic: "the shared packages",
@@ -203,11 +210,6 @@
       platformAutomerge: true,
       minimumReleaseAge: null,
       labels: ["dependencies", "shared", "automerge"],
-    },
-    {
-      matchDatasources: ["github-tags"],
-      matchPackageNames: ["Lautstark/**"],
-      enabled: false,
     },
 
     // ---------------------------------------------------------------------
