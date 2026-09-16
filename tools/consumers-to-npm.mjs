@@ -40,6 +40,7 @@ const write = (p, text) => { if (dry) console.log(`  would write ${p}`); else wr
 const PIN = /^github:Lautstark\/([^#]+)#v(\d+\.\d+\.\d+)$/;
 const pkg = JSON.parse(read('package.json'));
 let moved = 0;
+let manifestChanged = false;
 for (const field of ['dependencies', 'devDependencies']) {
   for (const [name, spec] of Object.entries(pkg[field] ?? {})) {
     const m = PIN.exec(spec);
@@ -67,9 +68,9 @@ const left = Object.values({ ...pkg.dependencies, ...pkg.devDependencies }).filt
 if (left.length === 0) {
   // The pin police go with the last pin.
   for (const [name, script] of Object.entries(pkg.scripts ?? {})) {
-    if (name === 'preflight' && /installcheck/.test(script)) { delete pkg.scripts[name]; console.log(`scripts.${name}: removed`); continue; }
+    if (name === 'preflight' && /installcheck/.test(script)) { delete pkg.scripts[name]; manifestChanged = true; console.log(`scripts.${name}: removed`); continue; }
     const cleaned = script.replace(/^node (tools\/|node_modules\/@lautstark\/design\/)installcheck\.mjs && /, '');
-    if (cleaned !== script) { pkg.scripts[name] = cleaned; console.log(`scripts.${name}: without the install check`); }
+    if (cleaned !== script) { pkg.scripts[name] = cleaned; manifestChanged = true; console.log(`scripts.${name}: without the install check`); }
   }
   if (existsSync(join(root, 'tools/installcheck.mjs'))) {
     console.log('tools/installcheck.mjs: removed');
@@ -83,8 +84,14 @@ if (left.length === 0) {
       // A step is `      - ` up to the next line at that indent; drop the ones
       // that run pins.js, the preflight or the install check.
       const after = before.replace(/^      - (?:name:[^\n]*\n(?:        [^\n]*\n|\n)*?|)        run: (?:npm run preflight|node (?:tools\/|node_modules\/@lautstark\/design\/)(?:pins|installcheck)\.(?:m?js)[^\n]*)\n(?:\n)?/gm, '')
-        .replace(/^      - run: node node_modules\/@lautstark\/design\/pins\.js[^\n]*\n/gm, '');
+        .replace(/^      - run: node node_modules\/@lautstark\/design\/pins\.js[^\n]*\n/gm, '')
+        // The shadows step's comment leaned on the step above it.
+        .replace(/# pins\.js above asks whether this product has the right version of\n(\s*)# @lautstark\/design\. This asks the question underneath it: whether it\n\s*# is using it\./g,
+          '# Renovate keeps this product on the current @lautstark/design. This\n$1# asks the question underneath that: whether it is using it.');
       if (after !== before) { console.log(`${p}: pins/preflight steps removed`); write(p, after); }
+      for (const [i, line] of after.split('\n').entries()) {
+        if (/pins\.js|installcheck|preflight/.test(line)) console.log(`  ${p}:${i + 1} still mentions it in prose - read it: ${line.trim().slice(0, 70)}`);
+      }
     }
   }
   if (existsSync(join(root, 'tests/run.py'))) {
@@ -105,5 +112,5 @@ if (left.length === 0) {
   console.log(`${left.length} github: pin(s) left; the install check and pins.js stay until the last one is gone.`);
 }
 
-if (moved) write('package.json', JSON.stringify(pkg, null, 2) + '\n');
+if (moved || manifestChanged) write('package.json', JSON.stringify(pkg, null, 2) + '\n');
 console.log(moved ? `\n${moved} pin(s) moved. Now: npm install, the suites, commit.` : '\nNothing moved.');
