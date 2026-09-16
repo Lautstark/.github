@@ -249,6 +249,19 @@
       // dependencies".
     },
 
+    // The changelog preset semantic-release renders the notes with. Its 10
+    // line needs conventional-changelog-writer 9, and the notes generator
+    // (@semantic-release/release-notes-generator 14) still bundles writer 8 -
+    // design's first release run on 2026-09-16 died there. A dev-dependency
+    // bump to 10 would automerge on green tests, because nothing in a
+    // package's suite exercises semantic-release, and break the next release
+    // instead. So it is held at 9 here, once, until the generator moves; the
+    // day it does, this rule goes.
+    {
+      matchPackageNames: ["conventional-changelog-conventionalcommits"],
+      allowedVersions: "<10",
+    },
+
     // lockFileMaintenance is its own pull request, and is not automerged: it
     // can move transitive dependencies that no direct bump would have.
     {
