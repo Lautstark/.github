@@ -215,8 +215,16 @@
     // ---------------------------------------------------------------------
     // Everything else: grouped, and looked at by a person
     // ---------------------------------------------------------------------
+    // Not the shared packages, which the rule above has already claimed.
+    // Package rules apply in order and a later one wins on every field it
+    // sets, so without this exclusion the runtime rule came second, took
+    // `@lautstark/design` back into "runtime dependencies" and switched its
+    // automerge off - which is exactly what mitreden's first Dependency
+    // Dashboard showed on 2026-09-19: design v1.40.1 waiting under the
+    // runtime group with nobody to merge it.
     {
       matchDepTypes: ["dependencies"],
+      matchPackageNames: ["!Lautstark/**", "!@lautstark/**"],
       matchUpdateTypes: ["patch", "minor"],
       groupName: "runtime dependencies",
       commitMessageTopic: "the runtime dependencies",
