@@ -280,6 +280,17 @@
       allowedVersions: "<10",
     },
 
+    // TypeScript 7 is the native compiler, and svelte-check - which every
+    // Svelte repository's check runs - accepts typescript ^5 || ^6 as late as
+    // 4.7.6. A branch to 7 can only go red, and while it is offered Renovate
+    // does not offer 6, which is the version this family can actually take.
+    // Held here, once, for every repository; the day svelte-check's peer range
+    // takes 7, this rule goes.
+    {
+      matchPackageNames: ["typescript"],
+      allowedVersions: "<7",
+    },
+
     // lockFileMaintenance is its own pull request, and is not automerged: it
     // can move transitive dependencies that no direct bump would have.
     {
