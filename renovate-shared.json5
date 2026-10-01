@@ -98,6 +98,16 @@
 
   timezone: "Europe/Berlin",
 
+  // Let npm fetch git dependencies while Renovate updates a lockfile. The
+  // hosted Renovate runs npm with git fetching off, and every github: pin then
+  // fails with EALLOWGIT: package.json moves, the lockfile does not, and the
+  // consumer's installcheck refuses the branch - which is how every shared
+  // package bump of 2026-09-21 sat red. "all" rather than "root", because a
+  // github: package is built by its own `prepare`, and that install fetches
+  // the package's own github: pins (design, mostly), which npm counts as
+  // transitive.
+  npmrc: "allow-git=all",
+
   // Weekly. Monday before six, so a week's worth of updates is one thing to
   // look at on Monday morning rather than a trickle all week.
   schedule: ["before 6am on monday"],
