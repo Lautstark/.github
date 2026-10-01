@@ -73,10 +73,13 @@
 // its own too, through GitHub's own merge queue rather than by rebasing
 // outside the platform.
 //
-// NOT COVERED: Gradle, Kotlin, Android. The Android repository does not exist
-// yet, and a preset written against a guess about its build is a preset that
-// will be wrong when it arrives. Add a manager for it then, from the actual
-// build files.
+// GRADLE: vorlaut-app and zeigmal are Android, and config:recommended already
+// reads their build - gradle/libs.versions.toml, the build.gradle.kts files and
+// the wrapper - as their dashboards show (checked 2026-10-01). Nothing here
+// names a Gradle package, so their updates fall under the rules below as they
+// stand: a library is a runtime dependency a person looks at, a major waits.
+// The automerging rules are written against npm's dependency types and do not
+// reach Gradle, which is the cautious reading for an app on a child's tablet.
 // ---------------------------------------------------------------------------
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
